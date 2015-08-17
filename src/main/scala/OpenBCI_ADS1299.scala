@@ -4,6 +4,9 @@ import java.io.InputStream
 import java.io.OutputStream
 import org.OpenBCI.SerialPort
 
+/** Singleton containing static constants used by the OpenBCI Analog Front End
+ *
+ */
 object ADS1299 {
   // sample rate used by OpenBCI board...set by its Arduino code
   final val fs_Hz        : Float = 250.0f 
@@ -60,15 +63,15 @@ object ADS1299 {
       12  -> 5,
       24  -> 6)
   
-  private final val adcInputTypes = Map[Symbol, Int] =
+  private final val adcInputTypes : Map[Symbol, Int] =
     Map( // NB. ADSINPUT_NORMAL by default
-    'ADSINPUT_NORMAL	-> 0 
-    'ADSINPUT_SHORTED	-> 1 
-    'ADSINPUT_BIAS_MEAS	-> 2 
-    'ADSINPUT_MVDD	-> 3 
-    'ADSINPUT_TEMP	-> 4 
-    'ADSINPUT_TESTSIG	-> 5 
-    'ADSINPUT_BIAS_DRP	-> 6 
+    'ADSINPUT_NORMAL	-> 0,
+    'ADSINPUT_SHORTED	-> 1,
+    'ADSINPUT_BIAS_MEAS	-> 2,
+    'ADSINPUT_MVDD	-> 3,
+    'ADSINPUT_TEMP	-> 4,
+    'ADSINPUT_TESTSIG	-> 5,
+    'ADSINPUT_BIAS_DRP	-> 6,
     'ADSINPUT_BIAS_DRN	-> 7)
 
   private final val commands : Map[Symbol, Char] =
@@ -105,7 +108,7 @@ object ADS1299 {
       'sdCardLog5Mins   -> 'A', 'sdCardLog15Mins    -> 'S', 'sdCardLog30Mins  -> 'F',
       'sdCardLog1Hour   -> 'G', 'sdCardLog2Hours    -> 'H', 'sdCardLog4Hours  -> 'J',
       'sdCardLog12Hours -> 'K', 'sdCardLog24Hours   -> 'L',
-      'sdCardLogTest    -> 'a', 'sdCardStopLogging  -> 'j',
+      'sdCardLogTest    -> 'a', 'sdCardCloseFile    -> 'j',
       // Calibration and internal test signals
       'measureNoise     -> '0', // Connect all inputs to internal GND
       'measureDC        -> 'p', // Connect all inputs to DC
@@ -115,37 +118,149 @@ object ADS1299 {
       'testFastPulse2x  -> ']')
 }
 
-class OpenBCIADS1299(spm: SerialPortManager) {
-  private var state    = OpenBCIADS1299.states get 'NOCOM
-  private var dataMode = OpenBCIADS1299.dataModes get 'NONE
-  private var preferredDataMode = OpenBCIADS1299.dataModes get 'BIN_WAUX
+/** Class for sending data to and receiving data from an OpenBCI board.
+ * 
+ * @constructor Creates a new OpenBCI managed by a SerialPortManager
+ * @param spm A SerialPortManager that communicates with the OpenBCI.
+ * @param channels The number of channels available (8 or 16).
+ */
+class ADS1299(spm: SerialPort.SerialPortManager,
+  is32Bit:  Boolean = false,
+  chan:     Int     = 8) {
+  private val channels = if(chan > 8) 16 else 8
+  private var state    = ADS1299.states get 'NOCOM
+  private var dataMode = ADS1299.dataModes get 'NONE
+  private var preferredDataMode = ADS1299.dataModes get 'BIN_WAUX
 
-  def writeCommandCharacter(cmd: Char) =
-    if(commands.contains(cmd))
-      spm.write(cmd.toBytes)
+  private def booleanToChar(b: Boolean) = if(b) '1' else '0'
+
+  /** Write a character to the RFDuino dongle.
+   *  @param c A character
+   *  @return Nothing
+   */
+  @throws(classOf[IllegalArgumentException])
+  private def writeChar(c: Char) =
+    if(ADS1299.unusedCommands.contains(c))
+      throw new IllegalArgumentException(c + " is not an OpenBCI protocol character.")
     else
-      ()
+      spm.write(c)
 
-  def setChannelSettings(channel: Short,
-    powerDown: Boolean = false,
-    gain:  Int = 24,
-    inputType: Short = OpenBCIADS1288.adcInputTypes get 'ADSINPUT_NORMAL,
-    biasInclusion: Boolean = true,
-    connectPtoSRB2: Boolean = true,
-    connectPtoSRB1: Boolean = false) {
-      // Do input checking
-      writeCommandCharacter(commands get 'enterChannelSettings)
-      writeCharacter(powerDown)
-      writeCharacter(gain)
-      writeCharacter(inputType)
-      writeCharacter(biasInclusion)
-      writeCharacter(connectPinSRB2)
-      writeCharacter(connectPinSRB1)
-      writeCommandCharacter(commands get 'latchChannelSettings)
+  /** Write an integer to the RFDuino dongle
+   *  TODO: Convert integer to a protocol character (e.g. QWERTY...)
+   *  @param i An integer
+   *  @return Nothing
+   */
+  @throws(classOf[IllegalArgumentException])
+  private def writeInt(i: Int) = 
+    if(1 == i.toString.length)
+      writeChar((i + '0').toChar)
+    else
+      throw new IllegalArgumentException(i + " has more than one digit.")
+
+  /** Write a boolean to the RFDuino
+   *  @param b A boolean
+   *  @return Nothing
+   */
+  private def writeBoolean(b: Boolean) = writeChar(booleanToChar(b))
+
+  /** Write a short to the RFDuino
+   *  @param s A short
+   *  @return Nothing
+   */
+  private def writeShort(s: Short) = writeInt(s.toInt)
+
+  /** Write any valid OpenBCI ASCII protocol command to the RFDuino dongle.
+   *
+   *  @param c A command character
+   *  @return Nothing
+   */
+  @throws(classOf[IllegalArgumentException])
+  def writeCommand(cmd: Symbol) {
+    val command = ADS1299.commands get cmd
+    command match {
+      case Some(c) => spm.write(c)
+      case None => 
+      throw new IllegalArgumentException(cmd +
+        " is not an OpenBCI protocol command.")
+    }
   }
 
+  /** Write settings for a channel to the OpenBCI.
+   *
+   * @param channel The channel number in [0, 15]
+   * @param powerDown Whether or not to power down the channel
+   * @param gain The channel gain
+   * @param inputType
+   * @param biasInclusion Whether or not to include the channel in bias calculation
+   * @param connectPtoSRB2
+   * @param connectPtoSRB1
+   * @return Nothing
+   */
+  def setChannelSettings(channel: Short,
+    powerDown: Boolean      = false,
+    gain: Int               = 24,
+    inputType: Symbol       = 'ADSINPUT_NORMAL,
+    biasInclusion: Boolean  = true,
+    connectPtoSRB2: Boolean = true,
+    connectPtoSRB1: Boolean = false) {
+      writeCommand('enterChannelSettings)
+      try {
+        writeShort(channel)
+        writeBoolean(powerDown)
+        writeInt(gain)
+        writeInt(ADS1299.adcInputTypes getOrElse(inputType, 0))
+        writeBoolean(biasInclusion)
+        writeBoolean(connectPtoSRB2)
+        writeBoolean(connectPtoSRB1)
+      } catch {
+        case e: IllegalArgumentException =>
+        // If any write failed, reset to channel to defaults
+        writeCommand('latchChannelSettings)
+        writeCommand('enterChannelSettings)
+        writeShort(channel)
+        writeBoolean(false)
+        writeInt(24)
+        writeInt(ADS1299.adcInputTypes('ADSINPUT_NORMAL))
+        writeBoolean(true)
+        writeBoolean(true)
+        writeBoolean(false)
+        throw e
+      } finally {
+        writeCommand('latchChannelSettings)
+      }
+  }
 
+  /** Shut down the connection to this OpenBCI
+   *  @return Nothing
+   */
+  def close() {
+    writeCommand('sdCardCloseFile)
+    spm.close
+  }
 
+  /** Open a connection to this OpenBCI
+   *  @return Nothing
+   */
+  def open() {
+    if(!spm.isOpen) {
+      println("DEBUG: Port not open in SPM.")
+      return
+    } else if(8 == channels)
+      writeCommand('use8Channels)
+    else
+      writeCommand('use16Channels)
+    if(is32Bit)
+      writeCommand('softReset)
+    writeCommand('setdefaultChannelSettings)
+    writeCommand('getDefaultChannelSettings)
+    // read results here and wait for $$$
+    writeCommand('queryRegisterSettings)
+    // read results and wait for $$$
+    writeCommand('sdCardCloseFile)
+  }
+
+  /* Constructor is drawn primarily from the syncWithHardware
+   * routine from the OpenBCI_Processing project. */
 
   /* What's this about?
   if (prefered_datamode == DATAMODE_BIN_WAUX) {
