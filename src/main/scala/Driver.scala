@@ -1,16 +1,13 @@
-import jssc.SerialPortException
-import org.OpenBCI.SerialPort._
-import scala.util.{
-  Try,
-  Success,
-  Failure
-}
 import java.lang.{
   NumberFormatException,
   ArrayIndexOutOfBoundsException,
   IllegalArgumentException,
   UnsatisfiedLinkError
 }
+import jssc.SerialPortException
+import org.OpenBCI.ADS1299
+import org.OpenBCI.SerialPort._
+import scala.util.{ Try, Success, Failure }
 
 object OpenBCIDriver {
   def main(argv: Array[String]) {
@@ -28,26 +25,31 @@ object OpenBCIDriver {
         case e: UnsatisfiedLinkError =>
         println("OpenBCI driver encountered a JSSC link error:")
         e.printStackTrace
-        println("(NB. SBT is probably fried. Try restarting SBT.)")
-        System.exit(3)
-        return
+        println("Ensure forking is enabled in build.sbt.")
+        null
 
         case e: IllegalArgumentException =>
         println(e.getMessage)
-        System.exit(4)
-        return
+        null
 
         case e: SerialPortException => 
         print("OpenBCI driver encountered a JSSC exception on port ")
         println(e.getPortName + ": " + e.getExceptionType)
-        System.exit(5)
-        return
+        null
 
         case e: Throwable =>
         println("OpenBCI driver encountered an unhandled exception:")
         e.printStackTrace
-        System.exit(6)
-        return
+        null
       }
+
+    val ads1299: ADS1299 = serPortMgr match {
+      case Success(s) => ADS1299(s, true, 8)
+      case Failure(_) => System.exit(1); null
+    }
+
+    ads1299.open()
+    Thread.sleep(10000, 0)
+    ads1299.close
   }
 }

@@ -5,12 +5,15 @@ lazy val commonSettings = Seq(
 )
 
 /* SBT will use Maven to download JSSC */
-// val RxTx = "gnu.io" % "MFizz RxTx" % "2.2-20081207"
 val jssc = "org.scream3r" % "jssc" % "2.8.0"
-// Consider jSSC
 
 lazy val root = (project in file(".")).settings(
   commonSettings: _*).settings(
     name := "OpenBCIScala",
+    // Avoid UnsatisfiedLinkError with Native Libraries.
+    fork in (Test, run) := true,
+    fork in (Compile, run) := true,
+    // Forward stdin to the forked JVM
+    connectInput in run := true,
     libraryDependencies += jssc
   )
