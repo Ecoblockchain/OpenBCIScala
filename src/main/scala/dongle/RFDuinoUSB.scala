@@ -73,8 +73,8 @@ package org.openbci.dongle {
    */
   class RFDuinoUSB(spm: SerialPortManager, is32Bit: Boolean = false, chan: Int = 8) {
 
-    private var opened   = false
-    private val channels = if(chan > 8) 16 else 8
+    private var opened       = false
+    private val channels     = if(chan > 8) 16 else 8
 
     /** Write a protocol charecter via the serial port manager.
      *  @param c A character
@@ -123,11 +123,12 @@ package org.openbci.dongle {
         biasInclusion: Boolean  = true,
         connectPtoSRB2: Boolean = true,
         connectPtoSRB1: Boolean = false) {
+          var setGain = ADS1299.gainLevels(gain)
           writeCommand('enterChannelSettings)
           try {
             spm.write(channel)
             spm.write(powerDown)
-            spm.write(ADS1299.gainLevels(gain))
+            spm.write(setGain)
             spm.write(ADS1299.adcInputTypes getOrElse(inputType, 0))
             spm.write(biasInclusion)
             spm.write(connectPtoSRB2)
@@ -135,19 +136,21 @@ package org.openbci.dongle {
           } catch {
             case e: IllegalArgumentException =>
             // If any write failed, reset to channel to defaults
+            setGain = ADS1299.gainLevels(24) // Default gain
             writeCommand('latchChannelSettings)
             writeCommand('enterChannelSettings)
             spm.write(channel)
             spm.write(false)
-            spm.write(ADS1299.gainLevels(24)) // Default gain
+            spm.write(setGain)
             spm.write(ADS1299.adcInputTypes('ADSINPUT_NORMAL))
             spm.write(true)
             spm.write(true)
             spm.write(false)
             throw e
-            } finally {
-              writeCommand('latchChannelSettings)
-            }
+          } finally {
+            writeCommand('latchChannelSettings)
+            ADS1299.gain = setGain
+          }
       }
 
       /** Read characters until the EOM string is found

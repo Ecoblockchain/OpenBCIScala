@@ -26,13 +26,15 @@ package org.openbci {
     final val fs_Hz        : Float = 250.0f 
 
     // reference voltage for ADC in RFDuinoUSBDongle.  set by its hardware
-    final val ADS1299_Vref : Float = 4.5f
+    final val Vref : Float = 4.5f
 
     // assumed gain setting for RFDuinoUSBDongle.  set by its Arduino code
-    final val ADS1299_gain : Float = 24.0f 
+    var gain : Float = 24.0f 
 
     // ADS1299 datasheet Table 7, confirmed through experiment
-    final val scale_fac_uVolts_per_count : Float = (ADS1299_Vref / (math.pow(2,23)-1) / ADS1299_gain * 1000000).toFloat
+    // Cf. http://docs.openbci.com/software/02-OpenBCI_Streaming_Data_Format#openbci-v3-data-format-interpreting-the-eeg-data
+    def scaleCountToMicrovolts(count: Int): Float =
+      (Vref / (math.pow(2,23)-1) / gain * 1000000).toFloat
 
     // assume set to +/4G, so 2 mG per digit (datasheet). Account for 4 bits unused
     final val scale_fac_accel_G_per_count : Float = (0.002 / math.pow(2,4)).toFloat
