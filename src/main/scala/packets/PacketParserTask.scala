@@ -1,9 +1,10 @@
+import java.io.PrintWriter
 import java.util.concurrent.LinkedBlockingQueue
 import jssc.SerialPortException
 import org.openbci.packets.OpenBCIPacketV3
 
 package org.openbci.packets {
-  class PacketParserTask(rawEvents: LinkedBlockingQueue[Array[Byte]])
+  class PacketParserTask(rawEvents: LinkedBlockingQueue[Array[Byte]], writer: PrintWriter)
   extends Runnable {
     def run {
       try {
@@ -11,10 +12,11 @@ package org.openbci.packets {
           val rawPacket: Array[Byte] = rawEvents.take
           try {
             val packet = OpenBCIPacketV3(rawPacket)
-            println(packet.toString)
+            writer.println(packet)
+            writer.flush
           }
           catch {
-            case e: IllegalArgumentException => println("Exception on read of: " + new String(rawPacket))
+            case e: IllegalArgumentException => println("Unable to read packet: " + new String(rawPacket))
           }
         }
       } catch {

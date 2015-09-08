@@ -20,7 +20,7 @@ package org.openbci.serial {
    bufSize: Int = 33) extends SerialPortEventListener {
 
    def logSerialEvent(e: SerialPortEvent, eType: String) =
-     SerialPortReader.log.info(e.getPortName + ": " + eType + " - " + e.getEventValue)
+     SerialPortReader.log.fine(e.getPortName + ": " + eType + " - " + e.getEventValue)
 
    @throws(classOf[SerialPortException])
    def serialEvent(event: SerialPortEvent) {
