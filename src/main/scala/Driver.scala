@@ -18,7 +18,10 @@ object OpenBCIDriver {
      */
     val logDirectory = new File("logs")
     logDirectory.mkdir
-    val logFile = logDirectory.toString + System.getProperty("file.separator") + "OpenBCI-Data-Packets_" + LocalDateTime.now.toString.replaceAll(":","-") +".txt"
+    val logFile = logDirectory.toString +
+      System.getProperty("file.separator") + "OpenBCI-Data-Packets_" +
+      LocalDateTime.now.toString.replaceAll(":","-") + ".csv"
+
     val logWriter: PrintWriter = new PrintWriter(logFile, "US-ASCII")
 
     /* Get the name of the serial port on which the OpenBCI USB Dongle resides.

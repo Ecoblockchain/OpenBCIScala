@@ -37,9 +37,9 @@ package org.openbci.packets {
       }
 
     override def toString: String =
-      "[" ++ (List(sample,
+      List(sample,
         eegChannel1, eegChannel2, eegChannel3, eegChannel4,
         eegChannel5, eegChannel6, eegChannel7, eegChannel8,
-        accelX, accelY, accelZ) mkString ", ") ++ "]"
+        accelX, accelY, accelZ) mkString ", "
   }
 }
