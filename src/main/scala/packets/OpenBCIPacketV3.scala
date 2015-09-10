@@ -41,7 +41,7 @@ package org.openbci.packets {
       }
 
     override def toString: String =
-      List(sample.toString,
+      List(sample.toString, // toString avoids outputting all values as floats.
         eegChannel1, eegChannel2, eegChannel3, eegChannel4,
         eegChannel5, eegChannel6, eegChannel7, eegChannel8,
         accelX.toString, accelY.toString, accelZ.toString) mkString ", "

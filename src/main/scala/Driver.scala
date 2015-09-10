@@ -15,14 +15,24 @@ object OpenBCIDriver {
   def main(argv: Array[String]) {
 
     /* Set up logging directory for EEG data packets.
+     *
+     * NB.  Windows cannot have a ":" in the filename,
+     *      and OLEDB connections used to read the CSV
+     *      will throw an exception if extra "." characters
+     *      are present in the CSV filename.
      */
     val logDirectory = new File("logs")
     logDirectory.mkdir
     val logFile = logDirectory.toString +
       System.getProperty("file.separator") + "OpenBCI-Data-Packets_" +
-      LocalDateTime.now.toString.replaceAll(":","-") + ".csv"
+      LocalDateTime.now.toString.replaceAll(":","-").replaceAll(".","-") + ".csv"
 
+    // Generate a log file and write column headers to it.
     val logWriter: PrintWriter = new PrintWriter(logFile, "US-ASCII")
+    logWriter.print("SEQ, ")
+    1 to 8      map (chan => logWriter.print("EEG" + chan + ", "))
+    'X' to 'Z'  map (axis => logWriter.print("ACC" + axis + ", "))
+    logWriter.println
 
     /* Get the name of the serial port on which the OpenBCI USB Dongle resides.
      */
